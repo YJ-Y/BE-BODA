@@ -146,7 +146,7 @@ class ChatAnswerGoldenMasterTest {
         actual.set("request", input);
 
         try {
-            ChatMessagePairResponse response = chatService.sendMessage(newChatSession(), request);
+            ChatMessagePairResponse response = chatService.sendMessage(newChatSession(), FIXTURE_USER_ID, request);
             actual.set("response", withoutVolatileFields(objectMapper.valueToTree(response)));
 
             Long aiMessageId = response.getAiMessage().getMessageId();

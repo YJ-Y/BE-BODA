@@ -111,9 +111,11 @@ public class ChatController {
     @PostMapping("/sessions/{chatSessionId}/messages")
     public ResponseEntity<ChatMessagePairResponse> sendMessage(
             @PathVariable Long chatSessionId,
-            @RequestBody ChatMessageRequest request
+            @RequestBody ChatMessageRequest request,
+            HttpSession session // 1. 로그인 정보 받기
     ) {
-        ChatMessagePairResponse response = chatService.sendMessage(chatSessionId, request);
+        Long userId = getUserId(session); // 2. 누구인지 꺼내기
+        ChatMessagePairResponse response = chatService.sendMessage(chatSessionId, userId, request); // 3. 같이 넘기기
         return ResponseEntity.ok(response);
     }
 
