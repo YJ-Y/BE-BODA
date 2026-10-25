@@ -9,12 +9,15 @@ import com.codit.be_boda.chat.repository.ChatSessionRepository;
 import com.codit.be_boda.chat.service.ChatService;
 import com.codit.be_boda.chat.type.QuestionType;
 import com.codit.be_boda.global.exception.BusinessException;
+import com.codit.be_boda.global.exception.ErrorCode;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -40,6 +43,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 /**
  * 채팅 칩 답변 회귀 테스트 (골든 마스터).
@@ -95,11 +99,16 @@ class ChatAnswerGoldenMasterTest {
     @MockBean
     private OpenAiChatModel chatModel;
 
-    @Autowired private ChatService chatService;
-    @Autowired private ChatSessionRepository chatSessionRepository;
-    @Autowired private ChatSessionPolicyRepository chatSessionPolicyRepository;
-    @Autowired private ObjectMapper objectMapper;
-    @Autowired private DataSource dataSource;
+    @Autowired
+    private ChatService chatService;
+    @Autowired
+    private ChatSessionRepository chatSessionRepository;
+    @Autowired
+    private ChatSessionPolicyRepository chatSessionPolicyRepository;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private DataSource dataSource;
 
     private ObjectMapper strictMapper;
     private ObjectWriter snapshotWriter;
@@ -146,12 +155,12 @@ class ChatAnswerGoldenMasterTest {
         actual.set("request", input);
 
         try {
-            ChatMessagePairResponse response = chatService.sendMessage(newChatSession(), request);
+            ChatMessagePairResponse response = chatService.sendMessage(newChatSession(), FIXTURE_USER_ID, request);
             actual.set("response", withoutVolatileFields(objectMapper.valueToTree(response)));
 
             Long aiMessageId = response.getAiMessage().getMessageId();
             actual.set("sources", withoutVolatileFields(
-                    objectMapper.valueToTree(chatService.getMessageSources(aiMessageId))
+                    objectMapper.valueToTree(chatService.getMessageSources(aiMessageId, FIXTURE_USER_ID))
             ));
         } catch (BusinessException e) {
             // 검증 실패 등 의도된 예외도 현재 동작의 일부로 기록한다.
@@ -210,5 +219,57 @@ class ChatAnswerGoldenMasterTest {
 
     private static String normalizeLineEndings(String text) {
         return text.replace("\r\n", "\n");
+
     }
+
+    @Test
+    @DisplayName("남의 채팅방에는 메시지를 보낼 수 없다")
+    void rejectsMessageFromNonOwner() throws IOException {
+        Long ownerSessionId = newChatSession();
+        Long otherUserId = 999L;
+
+        ObjectNode input = (ObjectNode) objectMapper.readTree(
+                ChatAnswerGoldenMasterTest.SCENARIO_DIR.resolve("01-fracture-cast-hospitalization.json").toFile()
+        );
+        input.put("questionType", QuestionType.CHIP_CLAIM.name());
+        ChatMessageRequest request = strictMapper.treeToValue(input, ChatMessageRequest.class);
+
+        assertThatThrownBy(() -> chatService.sendMessage(ownerSessionId, otherUserId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_SESSION_FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("남의 채팅방 대화 내역은 조회할 수 없다")
+    void rejectsHistoryFromNonOwner() {
+        Long ownerSessionId = newChatSession();
+
+        assertThatThrownBy(() -> chatService.getMessages(ownerSessionId, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_SESSION_FORBIDDEN);
+    }
+    @Test
+    @DisplayName("남의 채팅방 답변 근거는 조회할 수 없다")
+    void rejectsSourcesFromNonOwner() throws IOException {
+        ObjectNode input = (ObjectNode) objectMapper.readTree(
+                SCENARIO_DIR.resolve("01-fracture-cast-hospitalization.json").toFile()
+        );
+        input.put("questionType", QuestionType.CHIP_CLAIM.name());
+        ChatMessageRequest request = strictMapper.treeToValue(input, ChatMessageRequest.class);
+
+        // 주인(2번)이 메시지를 보내서 AI 답변을 하나 만든다
+        Long aiMessageId = chatService
+                .sendMessage(newChatSession(), FIXTURE_USER_ID, request)
+                .getAiMessage()
+                .getMessageId();
+
+        // 999번이 그 답변의 근거를 조회하면 막혀야 한다
+        assertThatThrownBy(() -> chatService.getMessageSources(aiMessageId, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_SESSION_FORBIDDEN);
+    }
+
 }
