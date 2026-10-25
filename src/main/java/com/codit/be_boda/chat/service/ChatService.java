@@ -326,7 +326,7 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
-    public ChatMessageSourceResponse getMessageSources(Long messageId) {
+    public ChatMessageSourceResponse getMessageSources(Long messageId, Long userId) {
         if (messageId == null) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "messageId는 필수입니다.");
         }
@@ -339,6 +339,10 @@ public class ChatService {
         }
 
         ChatSession chatSession = findChatSession(chatMessage.getChatSessionId());
+
+        if (!chatSession.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.CHAT_SESSION_FORBIDDEN);
+        }
 
         if (chatSession.getTermsDocumentId() == null) {
             return ChatMessageSourceResponse.termsNotUploaded(messageId);

@@ -160,7 +160,7 @@ class ChatAnswerGoldenMasterTest {
 
             Long aiMessageId = response.getAiMessage().getMessageId();
             actual.set("sources", withoutVolatileFields(
-                    objectMapper.valueToTree(chatService.getMessageSources(aiMessageId))
+                    objectMapper.valueToTree(chatService.getMessageSources(aiMessageId, FIXTURE_USER_ID))
             ));
         } catch (BusinessException e) {
             // 검증 실패 등 의도된 예외도 현재 동작의 일부로 기록한다.
@@ -250,6 +250,26 @@ class ChatAnswerGoldenMasterTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_SESSION_FORBIDDEN);
     }
+    @Test
+    @DisplayName("남의 채팅방 답변 근거는 조회할 수 없다")
+    void rejectsSourcesFromNonOwner() throws IOException {
+        ObjectNode input = (ObjectNode) objectMapper.readTree(
+                SCENARIO_DIR.resolve("01-fracture-cast-hospitalization.json").toFile()
+        );
+        input.put("questionType", QuestionType.CHIP_CLAIM.name());
+        ChatMessageRequest request = strictMapper.treeToValue(input, ChatMessageRequest.class);
 
+        // 주인(2번)이 메시지를 보내서 AI 답변을 하나 만든다
+        Long aiMessageId = chatService
+                .sendMessage(newChatSession(), FIXTURE_USER_ID, request)
+                .getAiMessage()
+                .getMessageId();
+
+        // 999번이 그 답변의 근거를 조회하면 막혀야 한다
+        assertThatThrownBy(() -> chatService.getMessageSources(aiMessageId, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_SESSION_FORBIDDEN);
+    }
 
 }
