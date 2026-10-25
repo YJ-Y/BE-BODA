@@ -239,4 +239,17 @@ class ChatAnswerGoldenMasterTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAT_SESSION_FORBIDDEN);
     }
+
+    @Test
+    @DisplayName("남의 채팅방 대화 내역은 조회할 수 없다")
+    void rejectsHistoryFromNonOwner() {
+        Long ownerSessionId = newChatSession();
+
+        assertThatThrownBy(() -> chatService.getMessages(ownerSessionId, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_SESSION_FORBIDDEN);
+    }
+
+
 }

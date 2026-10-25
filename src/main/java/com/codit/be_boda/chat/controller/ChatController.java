@@ -127,9 +127,12 @@ public class ChatController {
     @ApiResponse(responseCode = "404", description = "존재하지 않는 채팅방")
     @GetMapping("/sessions/{chatSessionId}/messages")
     public ResponseEntity<List<ChatMessageResponse>> getMessages(
-            @PathVariable Long chatSessionId
+            @PathVariable Long chatSessionId,
+            HttpSession session
     ) {
-        List<ChatMessageResponse> response = chatService.getMessages(chatSessionId);
+
+        Long userId = getUserId(session);
+        List<ChatMessageResponse> response = chatService.getMessages(chatSessionId, userId);
         return ResponseEntity.ok(response);
     }
 

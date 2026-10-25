@@ -283,8 +283,12 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
-    public List<ChatMessageResponse> getMessages(Long chatSessionId) {
-        findChatSession(chatSessionId);
+    public List<ChatMessageResponse> getMessages(Long chatSessionId, Long userId) {
+        ChatSession chatSession = findChatSession(chatSessionId);
+
+        if (!chatSession.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.CHAT_SESSION_FORBIDDEN);
+        }
 
         List<ChatMessage> messages =
                 chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(
