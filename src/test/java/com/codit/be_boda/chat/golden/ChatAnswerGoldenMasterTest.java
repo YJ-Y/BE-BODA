@@ -9,12 +9,15 @@ import com.codit.be_boda.chat.repository.ChatSessionRepository;
 import com.codit.be_boda.chat.service.ChatService;
 import com.codit.be_boda.chat.type.QuestionType;
 import com.codit.be_boda.global.exception.BusinessException;
+import com.codit.be_boda.global.exception.ErrorCode;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -40,6 +43,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 /**
  * 채팅 칩 답변 회귀 테스트 (골든 마스터).
@@ -95,11 +99,16 @@ class ChatAnswerGoldenMasterTest {
     @MockBean
     private OpenAiChatModel chatModel;
 
-    @Autowired private ChatService chatService;
-    @Autowired private ChatSessionRepository chatSessionRepository;
-    @Autowired private ChatSessionPolicyRepository chatSessionPolicyRepository;
-    @Autowired private ObjectMapper objectMapper;
-    @Autowired private DataSource dataSource;
+    @Autowired
+    private ChatService chatService;
+    @Autowired
+    private ChatSessionRepository chatSessionRepository;
+    @Autowired
+    private ChatSessionPolicyRepository chatSessionPolicyRepository;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private DataSource dataSource;
 
     private ObjectMapper strictMapper;
     private ObjectWriter snapshotWriter;
@@ -210,5 +219,24 @@ class ChatAnswerGoldenMasterTest {
 
     private static String normalizeLineEndings(String text) {
         return text.replace("\r\n", "\n");
+
+    }
+
+    @Test
+    @DisplayName("남의 채팅방에는 메시지를 보낼 수 없다")
+    void rejectsMessageFromNonOwner() throws IOException {
+        Long ownerSessionId = newChatSession();
+        Long otherUserId = 999L;
+
+        ObjectNode input = (ObjectNode) objectMapper.readTree(
+                ChatAnswerGoldenMasterTest.SCENARIO_DIR.resolve("01-fracture-cast-hospitalization.json").toFile()
+        );
+        input.put("questionType", QuestionType.CHIP_CLAIM.name());
+        ChatMessageRequest request = strictMapper.treeToValue(input, ChatMessageRequest.class);
+
+        assertThatThrownBy(() -> chatService.sendMessage(ownerSessionId, otherUserId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CHAT_SESSION_FORBIDDEN);
     }
 }
