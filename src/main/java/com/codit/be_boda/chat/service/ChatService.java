@@ -64,6 +64,7 @@ public class ChatService {
     private final ChatMessageRequestValidator chatMessageRequestValidator;
     private final ChatAnswerService chatAnswerService;
     private final ChatMessageSourceRepository chatMessageSourceRepository;
+    private final ChatMessageWriter chatMessageWriter;
     private final com.codit.be_boda.dashboard.repository.DashboardRepository dashboardRepository;
     private final com.codit.be_boda.dashboard.service.DashboardService dashboardService;
 
@@ -219,41 +220,38 @@ public class ChatService {
         return ChatSessionResponse.from(savedSession);
     }
 
-    @Transactional
+    // 트랜잭션을 메서드 전체에 걸지 않는다.
+    // OpenAI 응답을 기다리는 동안 DB 커넥션을 붙잡지 않도록, 저장 구간만 ChatMessageWriter에서 짧게 나눠 건다.
     public ChatMessagePairResponse sendMessage(Long chatSessionId, Long userId, ChatMessageRequest request) {
         chatMessageRequestValidator.validate(request);
-        ChatSession chatSession = findChatSession(chatSessionId);
 
+        ChatSession chatSession = findChatSession(chatSessionId);
         if (!chatSession.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.CHAT_SESSION_FORBIDDEN);
         }
 
         QuestionType questionType = resolveQuestionType(request);
-        // 첫 번째 질문이면 설문 데이터로 system_prompt 조립 후 저장
-        // 이후 질문부터는 저장된 system_prompt 재사용 (설문 미전송)
-        if (chatSession.isFirstMessage()
-                && questionType != QuestionType.FREE_TEXT) {
 
-            String systemPrompt =
-                    buildSystemPrompt(request);
-
-            chatSession.saveSystemPrompt(systemPrompt);
-            chatSessionRepository.save(chatSession);
+        // 첫 번째 질문이면 설문 데이터로 system_prompt 조립 (저장은 Writer에서)
+        String systemPrompt = null;
+        if (chatSession.isFirstMessage() && questionType != QuestionType.FREE_TEXT) {
+            systemPrompt = buildSystemPrompt(request);
         }
-
-        String userMessageContent = buildUserMessageContent(questionType, request);
 
         ChatMessage userMessage = new ChatMessage(
                 chatSession.getChatSessionId(),
                 SenderType.USER,
                 questionType,
-                userMessageContent,
+                buildUserMessageContent(questionType, request),
                 false,
                 null
         );
 
-        ChatMessage savedUserMessage = chatMessageRepository.save(userMessage);
+        // 1. 첫 번째 저장
+        ChatMessage savedUserMessage =
+                chatMessageWriter.saveUserMessage(chatSession, systemPrompt, userMessage);
 
+        // 2. 답변 생성 (FREE_TEXT면 여기서 OpenAI 호출)
         ChatAnswerResult aiAnswer = chatAnswerService.generateAnswerResult(chatSession, request);
 
         ChatMessage aiMessage = new ChatMessage(
@@ -265,9 +263,8 @@ public class ChatService {
                 DEFAULT_DISCLAIMER
         );
 
-        ChatMessage savedAiMessage = chatMessageRepository.save(aiMessage);
-
-        saveMessageSources(savedAiMessage.getMessageId(), aiAnswer.sources());
+        // 3. 두 번째 저장
+        ChatMessage savedAiMessage = chatMessageWriter.saveAiMessage(aiMessage, aiAnswer.sources());
 
         return ChatMessagePairResponse.of(
                 chatSession.getChatSessionId(),
@@ -661,28 +658,6 @@ public class ChatService {
             return source.getCitedText();
         }
         return source.getChunkText();
-    }
-
-    private void saveMessageSources(Long messageId, List<AnswerSource> sources) {
-        if (sources == null || sources.isEmpty()) {
-            return;
-        }
-
-        List<ChatMessageSource> messageSources = sources.stream()
-                .filter(source -> source.chunkId() != null)
-                .map(source -> new ChatMessageSource(
-                        messageId,
-                        source.chunkId(),
-                        source.citedText(),
-                        source.relevanceScore()
-                ))
-                .toList();
-
-        if (messageSources.isEmpty()) {
-            return;
-        }
-
-        chatMessageSourceRepository.saveAll(messageSources);
     }
 
     private ChatSession findChatSession(Long chatSessionId) {
