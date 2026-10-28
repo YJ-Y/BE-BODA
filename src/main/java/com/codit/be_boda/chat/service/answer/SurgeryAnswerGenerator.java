@@ -4,6 +4,7 @@ import com.codit.be_boda.analysis.dto.CoverageAmountDto;
 import com.codit.be_boda.analysis.dto.CoverageItemDto;
 import com.codit.be_boda.analysis.dto.CoverageLlmResponse;
 import com.codit.be_boda.chat.dto.request.ChatMessageRequest;
+import com.codit.be_boda.chat.type.TreatmentType;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository.CoverageItemInfo;
 import com.codit.be_boda.chat.repository.PolicyAnalysisQueryRepository;
@@ -20,13 +21,19 @@ import java.util.Objects;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class SurgeryAnswerGenerator {
+public class SurgeryAnswerGenerator implements TreatmentAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
     private final CoverageDetailParser coverageDetailParser;
     private final PolicyAnalysisQueryRepository policyAnalysisQueryRepository;
 
+    @Override
+    public TreatmentType treatmentType() {
+        return TreatmentType.SURGERY;
+    }
+
     // CHIP_CLAIM 중 SURGERY 처리
+    @Override
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
         CoverageItemDto surgeryItem = findMatchedSurgeryItem(analysisId, request);
 
@@ -65,6 +72,7 @@ public class SurgeryAnswerGenerator {
 
         return answer.toString();
     }// CHIP_CLAIM 중 SURGERY 문자열 응답과 DTO 카드 데이터 생성
+    @Override
     public ClaimAnswerResult generateStructuredClaimAnswer(Long analysisId, ChatMessageRequest request) {
         String messageContent = generateClaimAnswer(analysisId, request);
 
@@ -102,6 +110,7 @@ public class SurgeryAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 SURGERY 처리
+    @Override
     public String generateAmountAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -207,6 +216,7 @@ public class SurgeryAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 SURGERY 문자열 응답과 DTO 카드 데이터 생성
+    @Override
     public AmountAnswerResult generateStructuredAmountAnswer(
             Long analysisId,
             ChatMessageRequest request

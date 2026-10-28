@@ -8,16 +8,11 @@ import com.codit.be_boda.chat.entity.ChatSession;
 import com.codit.be_boda.chat.entity.ChatSessionPolicy;
 import com.codit.be_boda.chat.repository.ChatSessionPolicyRepository;
 import com.codit.be_boda.chat.service.answer.AmountAnswerResult;
-import com.codit.be_boda.chat.service.answer.CastAnswerGenerator;
 import com.codit.be_boda.chat.service.answer.ClaimAnswerResult;
 import com.codit.be_boda.chat.service.answer.DentalAnswerGenerator;
-import com.codit.be_boda.chat.service.answer.DiagnosisAnswerGenerator;
-import com.codit.be_boda.chat.service.answer.DisabilityAnswerGenerator;
 import com.codit.be_boda.chat.service.answer.DocumentAnswerGenerator;
 import com.codit.be_boda.chat.service.answer.DocumentAnswerResult;
-import com.codit.be_boda.chat.service.answer.HospitalizationAnswerGenerator;
-import com.codit.be_boda.chat.service.answer.OutpatientAnswerGenerator;
-import com.codit.be_boda.chat.service.answer.SurgeryAnswerGenerator;
+import com.codit.be_boda.chat.service.answer.TreatmentAnswerGenerators;
 import com.codit.be_boda.chat.service.answer.ClaimEvidenceFinder;
 import com.codit.be_boda.chat.service.answer.freetext.FreeTextAnswerGenerator;
 import com.codit.be_boda.chat.type.QuestionType;
@@ -29,19 +24,17 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class ChatAnswerService {
 
     private final ChatSessionPolicyRepository chatSessionPolicyRepository;
-    private final CastAnswerGenerator castAnswerGenerator;
-    private final SurgeryAnswerGenerator surgeryAnswerGenerator;
-    private final HospitalizationAnswerGenerator hospitalizationAnswerGenerator;
+    // 치료 유형별 생성기 표 (치료 유형 → 생성기)
+    private final TreatmentAnswerGenerators treatmentAnswerGenerators;
+    // 치아는 사랑니·매복치 제외 안내라는 고유 분기가 있어 별도로 주입한다.
     private final DentalAnswerGenerator dentalAnswerGenerator;
-    private final DiagnosisAnswerGenerator diagnosisAnswerGenerator;
-    private final OutpatientAnswerGenerator outpatientAnswerGenerator;
-    private final DisabilityAnswerGenerator disabilityAnswerGenerator;
     private final DocumentAnswerGenerator documentAnswerGenerator;
     private final ClaimEvidenceFinder claimEvidenceFinder;
     private final FreeTextAnswerGenerator freeTextAnswerGenerator;
@@ -308,55 +301,13 @@ public class ChatAnswerService {
             TreatmentType treatmentType,
             boolean dentalExclusionDetected
     ) {
-        return switch (treatmentType) {
-            case CAST ->
-                    castAnswerGenerator.generateStructuredClaimAnswer(
-                            analysisId,
-                            request
-                    );
+        // 치아 고유 분기: 사랑니·매복치 제외 조건이 감지되면 보장 계산 대신 제외 안내를 한다.
+        if (treatmentType == TreatmentType.DENTAL && dentalExclusionDetected) {
+            return dentalAnswerGenerator.generateExcludedDentalClaimAnswer(request);
+        }
 
-            case SURGERY ->
-                    surgeryAnswerGenerator.generateStructuredClaimAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case HOSPITALIZATION ->
-                    hospitalizationAnswerGenerator.generateStructuredClaimAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case DENTAL ->
-                    dentalExclusionDetected
-                            ? dentalAnswerGenerator
-                              .generateExcludedDentalClaimAnswer(
-                                      request
-                              )
-                            : dentalAnswerGenerator
-                              .generateStructuredClaimAnswer(
-                                      analysisId,
-                                      request
-                              );
-
-            case DIAGNOSIS_ONLY ->
-                    diagnosisAnswerGenerator.generateStructuredClaimAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case OUTPATIENT ->
-                    outpatientAnswerGenerator.generateStructuredClaimAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case DISABILITY ->
-                    disabilityAnswerGenerator.generateStructuredClaimAnswer(
-                            analysisId,
-                            request
-                    );
-        };
+        return treatmentAnswerGenerators.get(treatmentType)
+                .generateStructuredClaimAnswer(analysisId, request);
     }
 
     // 여러 치료 유형의 결과를 하나로 병합
@@ -711,49 +662,8 @@ public class ChatAnswerService {
             ChatMessageRequest request,
             TreatmentType treatmentType
     ) {
-        return switch (treatmentType) {
-            case CAST ->
-                    castAnswerGenerator.generateStructuredAmountAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case SURGERY ->
-                    surgeryAnswerGenerator.generateStructuredAmountAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case HOSPITALIZATION ->
-                    hospitalizationAnswerGenerator.generateStructuredAmountAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case DENTAL ->
-                    dentalAnswerGenerator.generateStructuredAmountAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case DIAGNOSIS_ONLY ->
-                    diagnosisAnswerGenerator.generateStructuredAmountAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case OUTPATIENT ->
-                    outpatientAnswerGenerator.generateStructuredAmountAnswer(
-                            analysisId,
-                            request
-                    );
-
-            case DISABILITY ->
-                    disabilityAnswerGenerator.generateStructuredAmountAnswer(
-                            analysisId,
-                            request
-                    );
-        };
+        return treatmentAnswerGenerators.get(treatmentType)
+                .generateStructuredAmountAnswer(analysisId, request);
     }
 
     // CHIP_CLAIM 문자열 응답 생성
@@ -761,56 +671,10 @@ public class ChatAnswerService {
             Long analysisId,
             ChatMessageRequest request
     ) {
-        if (hasTreatmentType(request, TreatmentType.CAST)) {
-            return castAnswerGenerator.generateClaimAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.SURGERY)) {
-            return surgeryAnswerGenerator.generateClaimAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.HOSPITALIZATION)) {
-            return hospitalizationAnswerGenerator.generateClaimAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.DENTAL)) {
-            return dentalAnswerGenerator.generateClaimAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.DIAGNOSIS_ONLY)) {
-            return diagnosisAnswerGenerator.generateClaimAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.OUTPATIENT)) {
-            return outpatientAnswerGenerator.generateClaimAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.DISABILITY)) {
-            return disabilityAnswerGenerator.generateClaimAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        return "입력하신 치료 항목에 대해 청구 가능 여부를 확인하려면 추가 보장 항목 매칭이 필요합니다.";
+        return findFirstRequestedTreatmentType(request)
+                .map(treatmentType -> treatmentAnswerGenerators.get(treatmentType)
+                        .generateClaimAnswer(analysisId, request))
+                .orElse("입력하신 치료 항목에 대해 청구 가능 여부를 확인하려면 추가 보장 항목 매칭이 필요합니다.");
     }
 
     // CHIP_AMOUNT 문자열 응답 생성
@@ -818,56 +682,28 @@ public class ChatAnswerService {
             Long analysisId,
             ChatMessageRequest request
     ) {
-        if (hasTreatmentType(request, TreatmentType.CAST)) {
-            return castAnswerGenerator.generateAmountAnswer(
-                    analysisId,
-                    request
-            );
-        }
+        return findFirstRequestedTreatmentType(request)
+                .map(treatmentType -> treatmentAnswerGenerators.get(treatmentType)
+                        .generateAmountAnswer(analysisId, request))
+                .orElse("입력하신 치료 항목에 대한 예상 보험금 계산은 아직 준비 중입니다.");
+    }
 
-        if (hasTreatmentType(request, TreatmentType.SURGERY)) {
-            return surgeryAnswerGenerator.generateAmountAnswer(
-                    analysisId,
-                    request
-            );
-        }
+    // 문자열 응답에서 치료 유형이 여러 개일 때 어느 것을 우선할지 정하는 순서.
+    // 기존 if 체인의 순서를 그대로 옮겼다. (TreatmentType enum 선언 순서와 다르므로 명시적으로 둔다)
+    private static final List<TreatmentType> TEXT_ANSWER_PRIORITY = List.of(
+            TreatmentType.CAST,
+            TreatmentType.SURGERY,
+            TreatmentType.HOSPITALIZATION,
+            TreatmentType.DENTAL,
+            TreatmentType.DIAGNOSIS_ONLY,
+            TreatmentType.OUTPATIENT,
+            TreatmentType.DISABILITY
+    );
 
-        if (hasTreatmentType(request, TreatmentType.HOSPITALIZATION)) {
-            return hospitalizationAnswerGenerator.generateAmountAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.DENTAL)) {
-            return dentalAnswerGenerator.generateAmountAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.DIAGNOSIS_ONLY)) {
-            return diagnosisAnswerGenerator.generateAmountAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.OUTPATIENT)) {
-            return outpatientAnswerGenerator.generateAmountAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        if (hasTreatmentType(request, TreatmentType.DISABILITY)) {
-            return disabilityAnswerGenerator.generateAmountAnswer(
-                    analysisId,
-                    request
-            );
-        }
-
-        return "입력하신 치료 항목에 대한 예상 보험금 계산은 아직 준비 중입니다.";
+    private Optional<TreatmentType> findFirstRequestedTreatmentType(ChatMessageRequest request) {
+        return TEXT_ANSWER_PRIORITY.stream()
+                .filter(treatmentType -> hasTreatmentType(request, treatmentType))
+                .findFirst();
     }
 
     private AmountAnswerResult mergeAmountResults(

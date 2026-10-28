@@ -1,6 +1,7 @@
 package com.codit.be_boda.chat.service.answer;
 
 import com.codit.be_boda.chat.dto.request.ChatMessageRequest;
+import com.codit.be_boda.chat.type.TreatmentType;
 import org.springframework.stereotype.Component;
 import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
@@ -8,8 +9,14 @@ import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import java.util.List;
 
 @Component
-public class DisabilityAnswerGenerator {
+public class DisabilityAnswerGenerator implements TreatmentAnswerGenerator {
 
+    @Override
+    public TreatmentType treatmentType() {
+        return TreatmentType.DISABILITY;
+    }
+
+    @Override
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
         StringBuilder answer = new StringBuilder();
 
@@ -28,6 +35,7 @@ public class DisabilityAnswerGenerator {
     }
 
     // CHIP_CLAIM 중 DISABILITY 문자열 응답과 DTO 카드 데이터 생성
+    @Override
     public ClaimAnswerResult generateStructuredClaimAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -53,6 +61,7 @@ public class DisabilityAnswerGenerator {
         return new ClaimAnswerResult(messageContent, claimGuide);
     }
 
+    @Override
     public String generateAmountAnswer(Long analysisId, ChatMessageRequest request) {
         StringBuilder answer = new StringBuilder();
 
@@ -70,6 +79,7 @@ public class DisabilityAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 DISABILITY 문자열 응답과 카드 데이터 생성
+    @Override
     public AmountAnswerResult generateStructuredAmountAnswer(
             Long analysisId,
             ChatMessageRequest request

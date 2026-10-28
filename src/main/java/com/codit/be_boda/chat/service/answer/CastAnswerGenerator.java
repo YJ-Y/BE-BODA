@@ -4,6 +4,7 @@ import com.codit.be_boda.analysis.dto.CoverageAmountDto;
 import com.codit.be_boda.analysis.dto.CoverageItemDto;
 import com.codit.be_boda.analysis.dto.CoverageLlmResponse;
 import com.codit.be_boda.chat.dto.request.ChatMessageRequest;
+import com.codit.be_boda.chat.type.TreatmentType;
 import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
@@ -19,12 +20,18 @@ import java.util.ArrayList;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class CastAnswerGenerator {
+public class CastAnswerGenerator implements TreatmentAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
     private final CoverageDetailParser coverageDetailParser;
 
+    @Override
+    public TreatmentType treatmentType() {
+        return TreatmentType.CAST;
+    }
+
     // CHIP_CLAIM 중 CAST 처리
+    @Override
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
         List<CoverageItemInfo> coverageItems =
                 coverageItemQueryRepository.findByAnalysisId(analysisId);
@@ -60,6 +67,7 @@ public class CastAnswerGenerator {
     }
 
     // CHIP_CLAIM 중 CAST 문자열 응답과 DTO 카드 데이터 생성
+    @Override
     public ClaimAnswerResult generateStructuredClaimAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -115,6 +123,7 @@ public class CastAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 CAST 처리
+    @Override
     public String generateAmountAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -167,6 +176,7 @@ public class CastAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 CAST 문자열 응답과 카드 데이터 생성
+    @Override
     public AmountAnswerResult generateStructuredAmountAnswer(
             Long analysisId,
             ChatMessageRequest request

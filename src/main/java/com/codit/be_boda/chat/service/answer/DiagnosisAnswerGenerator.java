@@ -4,6 +4,7 @@ import com.codit.be_boda.analysis.dto.CoverageAmountDto;
 import com.codit.be_boda.analysis.dto.CoverageItemDto;
 import com.codit.be_boda.analysis.dto.CoverageLlmResponse;
 import com.codit.be_boda.chat.dto.request.ChatMessageRequest;
+import com.codit.be_boda.chat.type.TreatmentType;
 import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
@@ -19,11 +20,17 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class DiagnosisAnswerGenerator {
+public class DiagnosisAnswerGenerator implements TreatmentAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
     private final CoverageDetailParser coverageDetailParser;
 
+    @Override
+    public TreatmentType treatmentType() {
+        return TreatmentType.DIAGNOSIS_ONLY;
+    }
+
+    @Override
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
         // 1. message가 비어 있으면 진단명을 입력하라고 안내
         if (isBlank(request.getMessage())) {
@@ -58,6 +65,7 @@ public class DiagnosisAnswerGenerator {
     }
 
     // CHIP_CLAIM 중 DIAGNOSIS_ONLY 문자열 응답과 DTO 카드 데이터 생성
+    @Override
     public ClaimAnswerResult generateStructuredClaimAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -127,6 +135,7 @@ public class DiagnosisAnswerGenerator {
         return new ClaimAnswerResult(messageContent, claimGuide);
     }
 
+    @Override
     public String generateAmountAnswer(Long analysisId, ChatMessageRequest request) {
         if (isBlank(request.getMessage())) {
             return buildNeedDiagnosisNameAnswer();
@@ -156,6 +165,7 @@ public class DiagnosisAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 DIAGNOSIS_ONLY 문자열 응답과 카드 데이터 생성
+    @Override
     public AmountAnswerResult generateStructuredAmountAnswer(
             Long analysisId,
             ChatMessageRequest request

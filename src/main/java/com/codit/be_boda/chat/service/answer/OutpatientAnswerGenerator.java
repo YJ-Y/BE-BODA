@@ -4,6 +4,7 @@ import com.codit.be_boda.analysis.dto.CoverageAmountDto;
 import com.codit.be_boda.analysis.dto.CoverageItemDto;
 import com.codit.be_boda.analysis.dto.CoverageLlmResponse;
 import com.codit.be_boda.chat.dto.request.ChatMessageRequest;
+import com.codit.be_boda.chat.type.TreatmentType;
 import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
@@ -18,11 +19,17 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class OutpatientAnswerGenerator {
+public class OutpatientAnswerGenerator implements TreatmentAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
     private final CoverageDetailParser coverageDetailParser;
 
+    @Override
+    public TreatmentType treatmentType() {
+        return TreatmentType.OUTPATIENT;
+    }
+
+    @Override
     public String generateClaimAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -66,6 +73,7 @@ public class OutpatientAnswerGenerator {
     }
 
     // CHIP_CLAIM 중 OUTPATIENT 문자열 응답과 DTO 카드 데이터 생성
+    @Override
     public ClaimAnswerResult generateStructuredClaimAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -129,6 +137,7 @@ public class OutpatientAnswerGenerator {
         return new ClaimAnswerResult(messageContent, claimGuide);
     }
 
+    @Override
     public String generateAmountAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -154,6 +163,7 @@ public class OutpatientAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 OUTPATIENT 문자열 응답과 카드 데이터 생성
+    @Override
     public AmountAnswerResult generateStructuredAmountAnswer(
             Long analysisId,
             ChatMessageRequest request
