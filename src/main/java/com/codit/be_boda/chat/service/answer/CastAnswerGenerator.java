@@ -9,7 +9,6 @@ import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository.CoverageItemInfo;
 import com.codit.be_boda.chat.type.IncidentType;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -23,7 +22,7 @@ import java.util.ArrayList;
 public class CastAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
-    private final ObjectMapper objectMapper;
+    private final CoverageDetailParser coverageDetailParser;
 
     // CHIP_CLAIM 중 CAST 처리
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
@@ -35,7 +34,7 @@ public class CastAnswerGenerator {
                 continue;
             }
 
-            CoverageLlmResponse detail = parseCoverageDetail(coverageItem.detail());
+            CoverageLlmResponse detail = coverageDetailParser.parse(coverageItem.detail());
 
             if (detail.items() == null || detail.items().isEmpty()) {
                 continue;
@@ -133,7 +132,7 @@ public class CastAnswerGenerator {
             }
 
             CoverageLlmResponse detail =
-                    parseCoverageDetail(
+                    coverageDetailParser.parse(
                             coverageItem.detail()
                     );
 
@@ -339,7 +338,7 @@ public class CastAnswerGenerator {
         return coverageItemQueryRepository.findByAnalysisId(analysisId)
                 .stream()
                 .filter(item -> "골절재해".equals(item.coverageType()))
-                .map(item -> parseCoverageDetail(item.detail()))
+                .map(item -> coverageDetailParser.parse(item.detail()))
                 .filter(detail -> detail.items() != null)
                 .flatMap(detail -> detail.items().stream())
                 .filter(item -> item.coverageName() != null)
@@ -385,7 +384,7 @@ public class CastAnswerGenerator {
                 coverageItemQueryRepository.findByAnalysisId(analysisId)
                         .stream()
                         .filter(item -> "골절재해".equals(item.coverageType()))
-                        .map(item -> parseCoverageDetail(item.detail()))
+                        .map(item -> coverageDetailParser.parse(item.detail()))
                         .filter(detail -> detail.items() != null)
                         .flatMap(detail -> detail.items().stream())
                         .filter(item -> item.coverageName() != null)
@@ -568,7 +567,7 @@ public class CastAnswerGenerator {
                 continue;
             }
 
-            CoverageLlmResponse detail = parseCoverageDetail(coverageItem.detail());
+            CoverageLlmResponse detail = coverageDetailParser.parse(coverageItem.detail());
 
             if (detail.items() == null || detail.items().isEmpty()) {
                 continue;
@@ -739,17 +738,4 @@ public class CastAnswerGenerator {
     ) {
     }
 
-    // detail JSON 파싱
-    private CoverageLlmResponse parseCoverageDetail(String detail) {
-        if (detail == null || detail.isBlank()) {
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-
-        try {
-            return objectMapper.readValue(detail, CoverageLlmResponse.class);
-        } catch (Exception e) {
-            log.warn("coverage_item detail 파싱 실패. detail={}", detail, e);
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-    }
 }

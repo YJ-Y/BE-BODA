@@ -8,7 +8,6 @@ import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository.CoverageItemInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,7 +21,7 @@ import java.util.List;
 public class OutpatientAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
-    private final ObjectMapper objectMapper;
+    private final CoverageDetailParser coverageDetailParser;
 
     public String generateClaimAnswer(
             Long analysisId,
@@ -235,7 +234,7 @@ public class OutpatientAnswerGenerator {
 
         for (CoverageItemInfo coverageItem : coverageItems) {
             CoverageLlmResponse detail =
-                    parseCoverageDetail(coverageItem.detail());
+                    coverageDetailParser.parse(coverageItem.detail());
 
             if (detail.items() == null || detail.items().isEmpty()) {
                 continue;
@@ -330,26 +329,4 @@ public class OutpatientAnswerGenerator {
         return value.replaceAll("\\s+", "");
     }
 
-    private CoverageLlmResponse parseCoverageDetail(String detail) {
-        if (detail == null
-                || detail.isBlank()
-                || "null".equalsIgnoreCase(detail)) {
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-
-        try {
-            return objectMapper.readValue(
-                    detail,
-                    CoverageLlmResponse.class
-            );
-        } catch (Exception e) {
-            log.warn(
-                    "coverage_item detail 파싱 실패. detail={}",
-                    detail,
-                    e
-            );
-
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-    }
 }

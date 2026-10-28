@@ -8,7 +8,6 @@ import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository.CoverageItemInfo;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -23,8 +22,7 @@ import java.util.List;
 public class DiagnosisAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
-    private final ObjectMapper objectMapper;
-
+    private final CoverageDetailParser coverageDetailParser;
 
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
         // 1. message가 비어 있으면 진단명을 입력하라고 안내
@@ -128,7 +126,6 @@ public class DiagnosisAnswerGenerator {
 
         return new ClaimAnswerResult(messageContent, claimGuide);
     }
-
 
     public String generateAmountAnswer(Long analysisId, ChatMessageRequest request) {
         if (isBlank(request.getMessage())) {
@@ -305,7 +302,7 @@ public class DiagnosisAnswerGenerator {
         List<CoverageItemDto> matchedItems = new ArrayList<>();
 
         for (CoverageItemInfo coverageItem : coverageItems) {
-            CoverageLlmResponse detail = parseCoverageDetail(coverageItem.detail());
+            CoverageLlmResponse detail = coverageDetailParser.parse(coverageItem.detail());
 
             if (detail.items() == null || detail.items().isEmpty()) {
                 continue;
@@ -328,7 +325,6 @@ public class DiagnosisAnswerGenerator {
 
         return matchedItems;
     }
-
 
     // 진단지 계열인지 판단
     private boolean isDiagnosisCoverage(CoverageItemInfo coverageItem, CoverageItemDto item) {
@@ -616,7 +612,6 @@ public class DiagnosisAnswerGenerator {
         return cautions;
     }
 
-
     private String normalize(String value) {
         if (value == null) {
             return "";
@@ -632,17 +627,4 @@ public class DiagnosisAnswerGenerator {
         return value == null || value.isBlank();
     }
 
-
-    private CoverageLlmResponse parseCoverageDetail(String detail) {
-        if (detail == null || detail.isBlank() || "null".equalsIgnoreCase(detail)) {
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-
-        try {
-            return objectMapper.readValue(detail, CoverageLlmResponse.class);
-        } catch (Exception e) {
-            log.warn("coverage_item detail 파싱 실패. detail={}", detail, e);
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-    }
 }

@@ -9,7 +9,6 @@ import com.codit.be_boda.chat.repository.CoverageItemQueryRepository.CoverageIte
 import com.codit.be_boda.chat.repository.PolicyAnalysisQueryRepository;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -24,7 +23,7 @@ import java.util.Objects;
 public class SurgeryAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
-    private final ObjectMapper objectMapper;
+    private final CoverageDetailParser coverageDetailParser;
     private final PolicyAnalysisQueryRepository policyAnalysisQueryRepository;
 
     // CHIP_CLAIM 중 SURGERY 처리
@@ -401,7 +400,7 @@ public class SurgeryAnswerGenerator {
                 continue;
             }
 
-            CoverageLlmResponse detail = parseCoverageDetail(coverageItem.detail());
+            CoverageLlmResponse detail = coverageDetailParser.parse(coverageItem.detail());
 
             if (detail.items() == null || detail.items().isEmpty()) {
                 continue;
@@ -431,7 +430,7 @@ public class SurgeryAnswerGenerator {
                 continue;
             }
 
-            CoverageLlmResponse detail = parseCoverageDetail(coverageItem.detail());
+            CoverageLlmResponse detail = coverageDetailParser.parse(coverageItem.detail());
 
             if (detail.items() == null || detail.items().isEmpty()) {
                 continue;
@@ -636,17 +635,4 @@ public class SurgeryAnswerGenerator {
         return value.replaceAll("\\s+", "");
     }
 
-    // detail JSON 파싱
-    private CoverageLlmResponse parseCoverageDetail(String detail) {
-        if (detail == null || detail.isBlank()) {
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-
-        try {
-            return objectMapper.readValue(detail, CoverageLlmResponse.class);
-        } catch (Exception e) {
-            log.warn("coverage_item detail 파싱 실패. detail={}", detail, e);
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-    }
 }

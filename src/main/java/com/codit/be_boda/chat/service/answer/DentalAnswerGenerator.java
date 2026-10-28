@@ -11,7 +11,6 @@ import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository.CoverageItemInfo;
 import com.codit.be_boda.chat.type.DentalTreatmentCountType;
 import com.codit.be_boda.chat.type.DentalTreatmentType;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -25,7 +24,7 @@ import java.util.List;
 public class DentalAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
-    private final ObjectMapper objectMapper;
+    private final CoverageDetailParser coverageDetailParser;
 
     // CHIP_CLAIM 중 DENTAL 처리
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
@@ -546,7 +545,7 @@ public class DentalAnswerGenerator {
                 continue;
             }
 
-            CoverageLlmResponse detail = parseCoverageDetail(coverageItem.detail());
+            CoverageLlmResponse detail = coverageDetailParser.parse(coverageItem.detail());
 
             if (detail.items() == null || detail.items().isEmpty()) {
                 continue;
@@ -925,16 +924,4 @@ public class DentalAnswerGenerator {
         return value.replace(" ", "");
     }
 
-    private CoverageLlmResponse parseCoverageDetail(String detail) {
-        if (detail == null || detail.isBlank()) {
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-
-        try {
-            return objectMapper.readValue(detail, CoverageLlmResponse.class);
-        } catch (Exception e) {
-            log.warn("coverage_item detail 파싱 실패. detail={}", detail, e);
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-    }
 }
