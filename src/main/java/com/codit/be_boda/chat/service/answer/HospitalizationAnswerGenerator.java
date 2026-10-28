@@ -12,7 +12,6 @@ import com.codit.be_boda.chat.repository.CoverageItemQueryRepository.CoverageIte
 import com.codit.be_boda.chat.repository.PolicyAnalysisQueryRepository;
 import com.codit.be_boda.chat.type.HospitalType;
 import com.codit.be_boda.chat.type.RoomType;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,7 +26,7 @@ import java.util.List;
 public class HospitalizationAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
-    private final ObjectMapper objectMapper;
+    private final CoverageDetailParser coverageDetailParser;
     private final PolicyAnalysisQueryRepository policyAnalysisQueryRepository;
 
     // CHIP_CLAIM 중 HOSPITALIZATION 처리
@@ -418,7 +417,7 @@ public class HospitalizationAnswerGenerator {
             }
 
             CoverageLlmResponse detail =
-                    parseCoverageDetail(coverageItem.detail());
+                    coverageDetailParser.parse(coverageItem.detail());
 
             if (detail.items() == null || detail.items().isEmpty()) {
                 continue;
@@ -590,24 +589,4 @@ public class HospitalizationAnswerGenerator {
         return value.replaceAll("\\s+", "");
     }
 
-    private CoverageLlmResponse parseCoverageDetail(String detail) {
-        if (detail == null || detail.isBlank()) {
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-
-        try {
-            return objectMapper.readValue(
-                    detail,
-                    CoverageLlmResponse.class
-            );
-        } catch (Exception e) {
-            log.warn(
-                    "coverage_item detail 파싱 실패. detail={}",
-                    detail,
-                    e
-            );
-
-            return new CoverageLlmResponse(false, List.of(), null);
-        }
-    }
 }
