@@ -4,6 +4,7 @@ import com.codit.be_boda.analysis.dto.CoverageAmountDto;
 import com.codit.be_boda.analysis.dto.CoverageItemDto;
 import com.codit.be_boda.analysis.dto.CoverageLlmResponse;
 import com.codit.be_boda.chat.dto.request.ChatMessageRequest;
+import com.codit.be_boda.chat.type.TreatmentType;
 import com.codit.be_boda.chat.dto.request.HospitalizationInfoRequest;
 import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
@@ -23,13 +24,19 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class HospitalizationAnswerGenerator {
+public class HospitalizationAnswerGenerator implements TreatmentAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
     private final CoverageDetailParser coverageDetailParser;
     private final PolicyAnalysisQueryRepository policyAnalysisQueryRepository;
 
+    @Override
+    public TreatmentType treatmentType() {
+        return TreatmentType.HOSPITALIZATION;
+    }
+
     // CHIP_CLAIM 중 HOSPITALIZATION 처리
+    @Override
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
         HospitalizationInfoRequest hospitalizationInfo = request.getHospitalizationInfo();
 
@@ -73,6 +80,7 @@ public class HospitalizationAnswerGenerator {
     }
 
     // CHIP_CLAIM 중 HOSPITALIZATION 문자열 응답과 DTO 카드 데이터 생성
+    @Override
     public ClaimAnswerResult generateStructuredClaimAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -153,6 +161,7 @@ public class HospitalizationAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 HOSPITALIZATION 처리
+    @Override
     public String generateAmountAnswer(Long analysisId, ChatMessageRequest request) {
         HospitalizationInfoRequest hospitalizationInfo = request.getHospitalizationInfo();
 
@@ -235,6 +244,7 @@ public class HospitalizationAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 HOSPITALIZATION 문자열 응답과 카드 데이터 생성
+    @Override
     public AmountAnswerResult generateStructuredAmountAnswer(
             Long analysisId,
             ChatMessageRequest request

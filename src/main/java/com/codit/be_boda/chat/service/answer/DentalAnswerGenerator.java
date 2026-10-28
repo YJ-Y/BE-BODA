@@ -6,6 +6,7 @@ import com.codit.be_boda.analysis.dto.CoverageLlmResponse;
 import com.codit.be_boda.chat.dto.response.AmountGuideResponse;
 import com.codit.be_boda.chat.dto.response.ClaimGuideResponse;
 import com.codit.be_boda.chat.dto.request.ChatMessageRequest;
+import com.codit.be_boda.chat.type.TreatmentType;
 import com.codit.be_boda.chat.dto.request.DentalInfoRequest;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository;
 import com.codit.be_boda.chat.repository.CoverageItemQueryRepository.CoverageItemInfo;
@@ -21,12 +22,18 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class DentalAnswerGenerator {
+public class DentalAnswerGenerator implements TreatmentAnswerGenerator {
 
     private final CoverageItemQueryRepository coverageItemQueryRepository;
     private final CoverageDetailParser coverageDetailParser;
 
+    @Override
+    public TreatmentType treatmentType() {
+        return TreatmentType.DENTAL;
+    }
+
     // CHIP_CLAIM 중 DENTAL 처리
+    @Override
     public String generateClaimAnswer(Long analysisId, ChatMessageRequest request) {
         DentalInfoRequest dentalInfo = request.getDentalInfo();
 
@@ -71,6 +78,7 @@ public class DentalAnswerGenerator {
     }
 
     // CHIP_CLAIM 중 DENTAL 문자열 응답과 DTO 카드 데이터 생성
+    @Override
     public ClaimAnswerResult generateStructuredClaimAnswer(
             Long analysisId,
             ChatMessageRequest request
@@ -243,6 +251,7 @@ public class DentalAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 DENTAL 처리
+    @Override
     public String generateAmountAnswer(Long analysisId, ChatMessageRequest request) {
         DentalInfoRequest dentalInfo = request.getDentalInfo();
 
@@ -330,6 +339,7 @@ public class DentalAnswerGenerator {
     }
 
     // CHIP_AMOUNT 중 DENTAL 문자열 응답과 카드 데이터 생성
+    @Override
     public AmountAnswerResult generateStructuredAmountAnswer(
             Long analysisId,
             ChatMessageRequest request
