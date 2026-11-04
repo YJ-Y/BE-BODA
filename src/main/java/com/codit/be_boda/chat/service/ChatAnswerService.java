@@ -133,7 +133,8 @@ public class ChatAnswerService {
             AmountAnswerResult result =
                     generateAmountAnswerResult(
                             analysisId,
-                            request
+                            request,
+                            evidence.dentalExclusionDetected()
                     );
 
             AmountSourceBindingResult bindingResult =
@@ -143,11 +144,17 @@ public class ChatAnswerService {
                             result.amountGuide()
                     );
 
+            // 제외 판정이면 제외 조항도 근거로 같이 보여준다 (청구 칩과 같은 근거)
+            List<AnswerSource> sources = bindingResult.sources();
+            if (evidence.dentalExclusionDetected()) {
+                sources = mergeSources(evidence.dentalExclusionSources(), sources);
+            }
+
             return ChatAnswerResult.amount(
                     result.messageContent(),
                     bindingResult.amountGuide(),
-                    !bindingResult.sources().isEmpty(),
-                    bindingResult.sources()
+                    !sources.isEmpty(),
+                    sources
             );
         }
 
@@ -602,7 +609,8 @@ public class ChatAnswerService {
     // CHIP_AMOUNT 구조화 응답 생성
     private AmountAnswerResult generateAmountAnswerResult(
             Long analysisId,
-            ChatMessageRequest request
+            ChatMessageRequest request,
+            boolean dentalExclusionDetected
     ) {
         List<TreatmentType> treatmentTypes =
                 resolveEffectiveTreatmentTypes(
@@ -632,7 +640,8 @@ public class ChatAnswerService {
             return generateSingleAmountAnswerResult(
                     analysisId,
                     request,
-                    treatmentTypes.get(0)
+                    treatmentTypes.get(0),
+                    dentalExclusionDetected
             );
         }
 
@@ -645,7 +654,8 @@ public class ChatAnswerService {
                                         generateSingleAmountAnswerResult(
                                                 analysisId,
                                                 request,
-                                                treatmentType
+                                                treatmentType,
+                                                dentalExclusionDetected
                                         )
                                 )
                         )
@@ -657,8 +667,14 @@ public class ChatAnswerService {
     private AmountAnswerResult generateSingleAmountAnswerResult(
             Long analysisId,
             ChatMessageRequest request,
-            TreatmentType treatmentType
+            TreatmentType treatmentType,
+            boolean dentalExclusionDetected
     ) {
+        // 사랑니·매복치 제외면 금액 계산 대신 제외 안내 (청구 칩이랑 판단을 맞춤)
+        if (treatmentType == TreatmentType.DENTAL && dentalExclusionDetected) {
+            return dentalAnswerGenerator.generateExcludedDentalAmountAnswer(request);
+        }
+
         return treatmentAnswerGenerators.get(treatmentType)
                 .generateStructuredAmountAnswer(analysisId, request);
     }
@@ -701,6 +717,21 @@ public class ChatAnswerService {
         return TEXT_ANSWER_PRIORITY.stream()
                 .filter(treatmentType -> hasTreatmentType(request, treatmentType))
                 .findFirst();
+    }
+
+    // chunkId 기준으로 중복 빼고 앞 목록 순서 우선
+    private List<AnswerSource> mergeSources(
+            List<AnswerSource> first,
+            List<AnswerSource> second
+    ) {
+        Map<Long, AnswerSource> merged = new LinkedHashMap<>();
+        for (AnswerSource source : first) {
+            merged.putIfAbsent(source.chunkId(), source);
+        }
+        for (AnswerSource source : second) {
+            merged.putIfAbsent(source.chunkId(), source);
+        }
+        return new ArrayList<>(merged.values());
     }
 
     private AmountAnswerResult mergeAmountResults(

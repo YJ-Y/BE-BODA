@@ -179,6 +179,29 @@ public class DentalAnswerGenerator implements TreatmentAnswerGenerator {
     }
 
     // 약관에서 사랑니·제3대구치·매복치 발치 제외가 확인된 경우
+    // 사랑니·매복치 제외일 때 금액 칩 응답. 제외 사유는 청구 칩이랑 같은 걸 쓴다
+    public AmountAnswerResult generateExcludedDentalAmountAnswer(
+            ChatMessageRequest request
+    ) {
+        List<String> reasons =
+                generateExcludedDentalClaimAnswer(request)
+                        .claimGuide()
+                        .getReasons();
+
+        String messageContent =
+                "이번 치아 발치는 약관상 보장 대상에서 제외돼서 예상 보험금이 없어요.\n\n"
+                        + "[확인된 제외 조건]\n- "
+                        + String.join("\n- ", reasons);
+
+        AmountGuideResponse amountGuide = AmountGuideResponse.builder()
+                .calculationAvailable(false)
+                .estimatedItems(List.of())
+                .cautions(reasons)
+                .build();
+
+        return new AmountAnswerResult(messageContent, amountGuide);
+    }
+
     public ClaimAnswerResult generateExcludedDentalClaimAnswer(
             ChatMessageRequest request
     ) {
