@@ -83,6 +83,16 @@ public class ClaimEvidenceFinder {
                 .toList();
     }
 
+    // 답변 생성 전에 필요한 약관 근거를 한 번에 모아서 돌려준다
+    public AnswerEvidence collectEvidence(
+            Long termsDocumentId,
+            ChatMessageRequest request
+    ) {
+        return new AnswerEvidence(
+                findDentalExclusionSources(termsDocumentId, request)
+        );
+    }
+
     /**
      * 사랑니·제3대구치·매복치 발치에 해당하는 약관 제외 근거 검색
      */
