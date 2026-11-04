@@ -8,6 +8,7 @@ import com.codit.be_boda.chat.entity.ChatSession;
 import com.codit.be_boda.chat.entity.ChatSessionPolicy;
 import com.codit.be_boda.chat.repository.ChatSessionPolicyRepository;
 import com.codit.be_boda.chat.service.answer.AmountAnswerResult;
+import com.codit.be_boda.chat.service.answer.AnswerEvidence;
 import com.codit.be_boda.chat.service.answer.ClaimAnswerResult;
 import com.codit.be_boda.chat.service.answer.DentalAnswerGenerator;
 import com.codit.be_boda.chat.service.answer.DocumentAnswerGenerator;
@@ -71,18 +72,19 @@ public class ChatAnswerService {
                         ? null
                         : analysisIds.get(0);
 
+        // 약관 근거는 칩 분기 전에 한 번만 확인하고 모든 칩이 같이 쓴다.
+        // 칩마다 따로 확인했더니 사랑니 발치에서 청구 칩과 금액 칩 답이 엇갈렸음
+        AnswerEvidence evidence =
+                claimEvidenceFinder.collectEvidence(
+                        chatSession.getTermsDocumentId(),
+                        request
+                );
+
         // 칩1: 청구 가능 여부
         if (questionType == QuestionType.CHIP_CLAIM) {
 
-            List<AnswerSource> dentalExclusionSources =
-                    claimEvidenceFinder
-                            .findDentalExclusionSources(
-                                    chatSession.getTermsDocumentId(),
-                                    request
-                            );
-
             boolean dentalExclusionDetected =
-                    !dentalExclusionSources.isEmpty();
+                    evidence.dentalExclusionDetected();
 
             ClaimAnswerResult result =
                     limitClaimCautions(
@@ -97,7 +99,7 @@ public class ChatAnswerService {
             List<AnswerSource> sources;
 
             if (dentalExclusionDetected) {
-                sources = dentalExclusionSources;
+                sources = evidence.dentalExclusionSources();
             } else if (shouldBindGenericClaimSources(
                     result.claimGuide()
             )) {
@@ -154,8 +156,8 @@ public class ChatAnswerService {
             Map<TreatmentType, String> claimStatuses =
                     resolveDocumentClaimStatuses(
                             analysisId,
-                            chatSession.getTermsDocumentId(),
-                            request
+                            request,
+                            evidence
                     );
 
             DocumentAnswerResult result =
@@ -443,8 +445,8 @@ public class ChatAnswerService {
 
     private Map<TreatmentType, String> resolveDocumentClaimStatuses(
             Long analysisId,
-            Long termsDocumentId,
-            ChatMessageRequest request
+            ChatMessageRequest request,
+            AnswerEvidence evidence
     ) {
         if (analysisId == null
                 || request.getTreatmentTypes() == null
@@ -456,12 +458,7 @@ public class ChatAnswerService {
                 request.getTreatmentTypes().contains(
                         TreatmentType.DENTAL
                 )
-                        && !claimEvidenceFinder
-                        .findDentalExclusionSources(
-                                termsDocumentId,
-                                request
-                        )
-                        .isEmpty();
+                        && evidence.dentalExclusionDetected();
 
         Map<TreatmentType, String> statuses =
                 new LinkedHashMap<>();
